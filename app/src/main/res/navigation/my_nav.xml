@@ -7,12 +7,24 @@
 
     <fragment
         android:id="@+id/cameraFragment"
-        android:name="com.example.facedetectionapp.ui.CameraFragment"
+        android:name="com.example.facedetectionapp.presentation.view.CameraFragment"
         android:label="CameraFragment"
-        tools:layout="@layout/fragment_camera"/>
+        tools:layout="@layout/fragment_camera">
+        <argument
+            android:name="arg"
+            app:argType="com.example.facedetectionapp.util.EmotionTest"
+            android:defaultValue="TURN_LEFT" />
+        <action
+            android:id="@+id/action_cameraFragment_to_homeFragment"
+            app:destination="@id/homeFragment" />
+    </fragment>
     <fragment
         android:id="@+id/homeFragment"
-        android:name="com.example.facedetectionapp.ui.HomeFragment"
+        android:name="com.example.facedetectionapp.presentation.view.HomeFragment"
         android:label="fragment_home"
-        tools:layout="@layout/fragment_home" />
+        tools:layout="@layout/fragment_home" >
+        <action
+            android:id="@+id/action_homeFragment_to_cameraFragment"
+            app:destination="@id/cameraFragment" />
+    </fragment>
 </navigation>

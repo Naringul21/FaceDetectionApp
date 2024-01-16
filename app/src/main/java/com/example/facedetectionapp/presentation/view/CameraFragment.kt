@@ -1,4 +1,4 @@
-package com.example.facedetectionapp.ui
+package com.example.facedetectionapp.presentation.view
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -16,53 +16,92 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
-import androidx.room.Room
-import com.example.facedetectionapp.AppDatabase
-import com.example.facedetectionapp.data.EmotionResult
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.findNavController
+import com.example.facedetectionapp.R
 import com.example.facedetectionapp.util.BaseFragment
 import com.example.facedetectionapp.databinding.FragmentCameraBinding
-import com.example.facedetectionapp.util.EmotionState
+import com.example.facedetectionapp.presentation.viewmodel.CameraViewModel
+import com.example.facedetectionapp.util.EmotionTest
+import com.example.facedetectionapp.util.EmotionTestState
 import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-
+@AndroidEntryPoint
 class CameraFragment : BaseFragment<FragmentCameraBinding>(
     onInflate = FragmentCameraBinding::inflate
 ) {
     private lateinit var cameraExecutor: ExecutorService
-    private var isPromptDisplayed = false
-    private var emotionState: EmotionState = EmotionState.IDLE
+    private var emotionTest: EmotionTest = EmotionTest.TURN_LEFT
     private var countdownTimer: CountDownTimer? = null
     private val countdownDurationMillis = 10000
+    private val cameraViewModel by viewModels<CameraViewModel>()
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         permissionHandler()
         startCamera(binding.preview)
-        emotionState = EmotionState.IDLE
+        emotionTest = EmotionTest.TURN_LEFT
+        observeTest()
     }
 
     private fun startCountdown() {
         countdownTimer = object : CountDownTimer(countdownDurationMillis.toLong(), 1000) {
             override fun onTick(millisUntilFinished: Long) {
                 val secondsRemaining = millisUntilFinished / 1000
+                binding.textTimer.text = secondsRemaining.toString()
                 Log.d("Countdown", "Timer: $secondsRemaining second")
             }
 
             override fun onFinish() {
-                Toast.makeText(requireActivity(), "Fail! Time is up!", Toast.LENGTH_SHORT).show()
-                logEmotionResult("Fail",  false)
+                handlerCountdownFinish()
             }
-        }.start()
+        }
+        countdownTimer?.start()
+    }
+
+
+
+    private fun handlerCountdownFinish() {
+        when (emotionTest) {
+            EmotionTest.TURN_LEFT -> {
+                cameraViewModel.updateEmotionTest(
+                    EmotionTestState(
+                        "Head to Right",
+                        EmotionTest.TURN_RIGHT
+                    )
+                )
             }
+
+            EmotionTest.TURN_RIGHT -> {
+                cameraViewModel.updateEmotionTest(EmotionTestState("Smile", EmotionTest.SMILE))
+            }
+
+            EmotionTest.SMILE -> {
+                cameraViewModel.updateEmotionTest(
+                    EmotionTestState(
+                        "Neutral",
+                        EmotionTest.NEUTRAL
+                    )
+                )
+            }
+
+            EmotionTest.NEUTRAL -> {
+                cameraViewModel.insertEmotion()
+                stopCountdown()
+                findNavController().navigate(R.id.action_cameraFragment_to_homeFragment)
+
+            }
+        }
+    }
 
     private fun stopCountdown() {
         countdownTimer?.cancel()
@@ -126,8 +165,9 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(
             val faceDetector = FaceDetection.getClient(options)
             faceDetector.process(image)
                 .addOnSuccessListener { faces ->
-                    if (faces.isNotEmpty() && emotionState == EmotionState.COUNTDOWN) {
-                            checkEmotion(faces)
+                    if (faces.isNotEmpty()) {
+                        cameraViewModel.checkEmotion(faces[0])
+                        Log.d("FaceDetectionSuccess", "Success")
                     }
                 }
 
@@ -168,56 +208,16 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(
             }
         }
 
-        private fun checkEmotion(faces: List<Face>) {
-        for (face in faces) {
-            val rotY = face.headEulerAngleY
-            val smilingProbability = face.smilingProbability
 
-            if (rotY > 20) {
-                Log.d("FaceDetectionRight", "Face rotated to the right. Yaw: $rotY")
-                emotionState = EmotionState.TURN_RIGHT
-                logEmotionResult("right", true)
-            } else if (rotY < -20) {
-                Log.d("FaceDetectionLeft", "Face rotated to the left. Yaw: $rotY")
-                emotionState = EmotionState.TURN_LEFT
-                logEmotionResult("right", false)
-            } else if (smilingProbability!! > 0.7) {
-                Log.d("FaceDetectionSmile", "Smile. Yaw: $smilingProbability")
-                emotionState = EmotionState.LAUGH
-                logEmotionResult("smile", true)
-            }  else if (smilingProbability!! < 0.7) {
-                Log.d("FaceDetectionNeutral", "Neutral. Yaw: $smilingProbability")
-                emotionState = EmotionState.NOT_LAUGH
-                logEmotionResult("smile", false)
-            }else {
-                Log.d("FaceDetection", "No faces detected.")
+    fun observeTest() {
+        lifecycleScope.launch {
+            cameraViewModel.emotionState.collectLatest {
+                binding.textViewEmotion.text = it.testName
+                countdownTimer?.cancel()
+                startCountdown()
             }
-
-            isPromptDisplayed = false
         }
     }
-
-    private fun logEmotionResult(testText: String, isCorrect: Boolean) {
-        val result = EmotionResult(
-            testText = testText,
-            isCorrect = isCorrect
-        )
-
-        insertResultIntoDatabase(result)
-    }
-
-    private fun insertResultIntoDatabase(result: EmotionResult) {
-        val database = Room.databaseBuilder(
-            requireContext(),
-            AppDatabase::class.java,
-            "emotion_database"
-        ).build()
-
-        CoroutineScope(Dispatchers.IO).launch {
-            database.headTurnResultDao().insert(result)
-        }
-    }
-
 
     override fun onDestroy() {
         super.onDestroy()

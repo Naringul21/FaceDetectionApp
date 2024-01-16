@@ -1,4 +1,4 @@
-package com.example.facedetectionapp.ui
+package com.example.facedetectionapp.presentation.view
 
 import com.example.facedetectionapp.util.BaseFragment
 import com.example.facedetectionapp.databinding.FragmentHomeBinding
