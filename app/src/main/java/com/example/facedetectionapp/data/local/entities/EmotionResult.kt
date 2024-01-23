@@ -2,11 +2,13 @@ package com.example.facedetectionapp.data.local.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-@Entity
+@Entity(tableName = "emotion_result")
 data class EmotionResult (
     @PrimaryKey(autoGenerate = true)
-    var id: Long = 0,
-    var testText: String="",
-    var isCorrect: Boolean=false,
-    var timestamp: Long = System.currentTimeMillis()
-    )
+    val id:Long,
+
+    var left:Boolean=false,
+    var right:Boolean=false,
+    var smile:Boolean=false,
+    var neutral: Boolean=false
+)

@@ -1,4 +1,4 @@
-package com.example.facedetectionapp.util
+package com.example.facedetectionapp
 
 import android.app.Application
 import dagger.hilt.android.HiltAndroidApp

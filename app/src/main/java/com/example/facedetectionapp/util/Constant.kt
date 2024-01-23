@@ -1,8 +1,7 @@
 package com.example.facedetectionapp.util
 
-class Constant {
+object Constant {
 
-   companion object {
-       const val REQUIRED_PERMISSIONS = false
-   }
+
+    const val REQUIRED_PERMISSIONS = false
 }

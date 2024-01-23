@@ -9,10 +9,10 @@ import com.example.facedetectionapp.data.local.entities.EmotionResult
 @Dao
 interface EmotionResultDao {
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEmotion(emotionResult: EmotionResult)
 
-    @Query("SELECT*FROM emotionresult")
+    @Query("SELECT*FROM emotion_result")
     fun getEmotionData():LiveData<List<EmotionResult>>
 
 }

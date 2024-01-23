@@ -15,7 +15,12 @@ android {
     defaultConfig {
         applicationId = "com.example.facedetectionapp"
         minSdk = 27
-        targetSdk = 34
+        targetSdk = 31
+
+
+
+
+
         versionCode = 1
         versionName = "1.0"
 

@@ -1,13 +1,9 @@
 package com.example.facedetectionapp.presentation.view
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.CountDownTimer
 import android.util.Log
 import android.view.View
-import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
@@ -19,16 +15,16 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
-import com.example.facedetectionapp.R
 import com.example.facedetectionapp.util.BaseFragment
 import com.example.facedetectionapp.databinding.FragmentCameraBinding
 import com.example.facedetectionapp.presentation.viewmodel.CameraViewModel
-import com.example.facedetectionapp.util.EmotionTest
-import com.example.facedetectionapp.util.EmotionTestState
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.concurrent.ExecutorService
@@ -39,22 +35,21 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(
     onInflate = FragmentCameraBinding::inflate
 ) {
     private lateinit var cameraExecutor: ExecutorService
-    private var emotionTest: EmotionTest = EmotionTest.TURN_LEFT
     private var countdownTimer: CountDownTimer? = null
-    private val countdownDurationMillis = 10000
+    private val countdownDurationMillis = 8000
     private val cameraViewModel by viewModels<CameraViewModel>()
+    private var cameraProvider: ProcessCameraProvider? = null
+
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        permissionHandler()
         startCamera(binding.preview)
-        emotionTest = EmotionTest.TURN_LEFT
         observeTest()
     }
 
     private fun startCountdown() {
-        countdownTimer = object : CountDownTimer(countdownDurationMillis.toLong(), 1000) {
+        countdownTimer = object : CountDownTimer(countdownDurationMillis.toLong(), 1000L) {
             override fun onTick(millisUntilFinished: Long) {
                 val secondsRemaining = millisUntilFinished / 1000
                 binding.textTimer.text = secondsRemaining.toString()
@@ -62,49 +57,10 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(
             }
 
             override fun onFinish() {
-                handlerCountdownFinish()
+                cameraViewModel.setNextTest()
             }
         }
-        countdownTimer?.start()
-    }
-
-
-
-    private fun handlerCountdownFinish() {
-        when (emotionTest) {
-            EmotionTest.TURN_LEFT -> {
-                cameraViewModel.updateEmotionTest(
-                    EmotionTestState(
-                        "Head to Right",
-                        EmotionTest.TURN_RIGHT
-                    )
-                )
-            }
-
-            EmotionTest.TURN_RIGHT -> {
-                cameraViewModel.updateEmotionTest(EmotionTestState("Smile", EmotionTest.SMILE))
-            }
-
-            EmotionTest.SMILE -> {
-                cameraViewModel.updateEmotionTest(
-                    EmotionTestState(
-                        "Neutral",
-                        EmotionTest.NEUTRAL
-                    )
-                )
-            }
-
-            EmotionTest.NEUTRAL -> {
-                cameraViewModel.insertEmotion()
-                stopCountdown()
-                findNavController().navigate(R.id.action_cameraFragment_to_homeFragment)
-
-            }
-        }
-    }
-
-    private fun stopCountdown() {
-        countdownTimer?.cancel()
+        (countdownTimer as CountDownTimer).start()
     }
 
 
@@ -112,7 +68,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(
         val cameraProviderFuture = ProcessCameraProvider.getInstance(requireContext())
 
         cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
+            cameraProvider = cameraProviderFuture.get()
 
             val preview = Preview.Builder()
                 .build()
@@ -128,12 +84,17 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        proxyProgress(imageProxy)
+                        lifecycleScope.launch {
+                            imageProxy.proxyProcess().collectLatest { face ->
+                                Log.e("TAG", "startCamera: $face")
+                                cameraViewModel.identifyEmotion(face)
+                            }
+                        }
                     }
                 }
 
 
-            cameraProvider.bindToLifecycle(
+            cameraProvider?.bindToLifecycle(
                 viewLifecycleOwner,
                 cameraSelector,
                 preview,
@@ -146,84 +107,76 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(
 
     }
 
-    @androidx.annotation.OptIn(ExperimentalGetImage::class)
-    private fun proxyProgress(imageProxy: ImageProxy) {
-        val mediaImage = imageProxy.image
-        if (mediaImage != null) {
-            val image = InputImage.fromMediaImage(
-                mediaImage,
-                imageProxy.imageInfo.rotationDegrees
-            )
 
-            val options = FaceDetectorOptions.Builder()
-                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
-                .setMinFaceSize(0.15f)
-                .enableTracking()
-                .build()
-
-            val faceDetector = FaceDetection.getClient(options)
-            faceDetector.process(image)
-                .addOnSuccessListener { faces ->
-                    if (faces.isNotEmpty()) {
-                        cameraViewModel.checkEmotion(faces[0])
-                        Log.d("FaceDetectionSuccess", "Success")
-                    }
-                }
-
-                .addOnFailureListener { e ->
-                    Log.e("FaceDetectionError", "Face detection failed", e)
-                }
-                .addOnCompleteListener {
-                    imageProxy.close()
-                }
-        }
-    }
-
-
-    private fun permissionHandler() {
-        if (ContextCompat.checkSelfPermission(
-                requireContext(),
-                Manifest.permission.CAMERA
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestCameraPermission()
-        } else {
-        }
-    }
-
-    private fun requestCameraPermission() {
-        requestPermissionLauncher.launch(Manifest.permission.CAMERA)
-    }
-
-    private val requestPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
-            if (isGranted) {
-            } else {
-                Toast.makeText(
-                    requireContext(),
-                    "Camera permission denied",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        }
-
-
-    fun observeTest() {
+    private fun observeTest() {
         lifecycleScope.launch {
-            cameraViewModel.emotionState.collectLatest {
+            cameraViewModel.faceTestType.collectLatest {
                 binding.textViewEmotion.text = it.testName
                 countdownTimer?.cancel()
                 startCountdown()
             }
         }
+        lifecycleScope.launch {
+            cameraViewModel.isEndTest.collectLatest {
+                if (it) {
+                    findNavController().popBackStack()
+                }
+            }
+        }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        cameraExecutor.shutdown()
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+//        cameraExecutor.shutdown()
+        cameraProvider?.unbindAll()
+        cameraProvider = null
+        cameraExecutor?.shutdown()
+
+        countdownTimer?.cancel()
+        countdownTimer = null
+
+//        cameraExecutor = null
+    }
+
+
+    @androidx.annotation.OptIn(ExperimentalGetImage::class)
+    fun ImageProxy.proxyProcess() = callbackFlow<Face> {
+        val mediaImage = this@proxyProcess.image
+        if (mediaImage != null) {
+            val image = InputImage.fromMediaImage(
+                mediaImage,
+                this@proxyProcess.imageInfo.rotationDegrees
+            )
+
+            val options = FaceDetectorOptions.Builder()
+                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+                .build()
+
+            val faceDetector = FaceDetection.getClient(options)
+
+            faceDetector.process(image)
+                .addOnSuccessListener { faces ->
+                    if (faces.size > 0) {
+                        trySend(faces[0])
+                    }
+                    Log.e("face", "Yüz ${faces.size} yüz bulundu.")
+                }
+                .addOnFailureListener { e ->
+                    Log.e("FaceDetection", "Yüz tespiti başarısız", e)
+                }
+                .addOnCompleteListener {
+                    this@proxyProcess.close()
+                }
+            awaitClose {
+                this@proxyProcess.close()
+            }
+        }
+
+
     }
 }
+
 
 
 
