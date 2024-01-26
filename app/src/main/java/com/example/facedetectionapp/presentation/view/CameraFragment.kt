@@ -52,7 +52,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(
         countdownTimer = object : CountDownTimer(countdownDurationMillis.toLong(), 1000L) {
             override fun onTick(millisUntilFinished: Long) {
                 val secondsRemaining = millisUntilFinished / 1000
-                binding.textTimer.text = secondsRemaining.toString()
+                binding.textTimer.text = "Timer: $secondsRemaining"
                 Log.d("Countdown", "Timer: $secondsRemaining second")
             }
 
@@ -115,6 +115,7 @@ class CameraFragment : BaseFragment<FragmentCameraBinding>(
                 countdownTimer?.cancel()
                 startCountdown()
             }
+
         }
         lifecycleScope.launch {
             cameraViewModel.isEndTest.collectLatest {

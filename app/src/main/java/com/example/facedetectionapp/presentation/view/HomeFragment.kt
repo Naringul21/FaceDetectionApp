@@ -3,6 +3,7 @@ package com.example.facedetectionapp.presentation.view
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,6 +29,7 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setResultAdapter()
+        observeData()
 
         binding.btnStartCamera.setOnClickListener{
             permissionHandler()
@@ -63,16 +65,19 @@ class HomeFragment : BaseFragment<FragmentHomeBinding>(
             }
         }
 
-    private fun setResultAdapter() {
+   fun observeData(){
+       homeViewModel.getResultData().observe(viewLifecycleOwner){
+           resultAdapter.submitList(it)
+           Log.d("room_data", "{$it}")
+    }}
+
+     fun setResultAdapter() {
         binding.recyclerView.layoutManager =
             LinearLayoutManager(requireActivity())
         binding.recyclerView.adapter = resultAdapter
-        homeViewModel.getResultData().observe(viewLifecycleOwner){
-            resultAdapter.submitList(it)
+
 
     }
-
-}
 
 
 

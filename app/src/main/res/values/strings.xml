@@ -4,7 +4,7 @@
     <string name="hello_blank_fragment">Hello blank fragment</string>
 
     <string name="left">Head to left</string>
-    <string name="right">Hello blank fragment</string>
-    <string name="smile">Hello blank fragment</string>
-    <string name="neutral">Hello blank fragment</string>
+    <string name="right">Head to Right</string>
+    <string name="smile">Smile</string>
+    <string name="neutral">Neutral</string>
 </resources>

@@ -19,30 +19,21 @@ import javax.inject.Inject
 class CameraViewModel @Inject constructor(private val repo: Repository) : ViewModel() {
 
     private val _currentEmotionStateIndex = MutableStateFlow(0)
-    val currentEmotionStateIndex = _currentEmotionStateIndex.asStateFlow()
-    private var isTestInProgress = false
+
 
     private val _faceTestType =
-        MutableStateFlow(EmotionTest("Head to Left", EmotionType.NEUTRAL))
+        MutableStateFlow(EmotionTest("", EmotionType.NEUTRAL))
     val faceTestType = _faceTestType.asStateFlow()
 
-    private val _faceDetectionResult = MutableSharedFlow<Face>()
-    val faceDetectionResult: SharedFlow<Face> get() = _faceDetectionResult
 
-    var result = EmotionResult(0)
 
-    //
     private val _isEndTest =
         MutableStateFlow(false)
     val isEndTest = _isEndTest.asStateFlow()
-//
-//    fun updateEmotionTest(emotionTestState: EmotionTest) {
-//        _faceTestType.value = emotionTestState
-//    }
 
     val emotionTestList = listOf(
-        EmotionTest("Left", EmotionType.TURN_LEFT),
-        EmotionTest("Right", EmotionType.TURN_RIGHT),
+        EmotionTest("Turn to Left", EmotionType.TURN_LEFT),
+        EmotionTest("Turn to Right", EmotionType.TURN_RIGHT),
         EmotionTest("Smile", EmotionType.SMILE),
         EmotionTest("Neutral", EmotionType.NEUTRAL)
     )
@@ -57,12 +48,13 @@ class CameraViewModel @Inject constructor(private val repo: Repository) : ViewMo
             insertTestResult()
             _currentEmotionStateIndex.value = 0
             _isEndTest.value = true
+            Log.e("room_test", "${emotionResult.left} ")
         }
 
     }
 
 
-    private val emotionResult = EmotionResult(0)
+    private var emotionResult = EmotionResult(0)
 
     fun identifyEmotion(faces: Face) {
         val rotY = faces.headEulerAngleY
@@ -76,30 +68,34 @@ class CameraViewModel @Inject constructor(private val repo: Repository) : ViewMo
                     emotionResult.left = true
                     setNextTest()
                 }
-                Log.d("FaceDetectLeft", "$rotY")
+                Log.d("FaceDetectLeft", "${emotionResult.left}")
             }
 
             EmotionType.TURN_RIGHT -> {
                 if (rotY.toInt() < -20) {
-                    setNextTest()
                     emotionResult.right = true
+                    setNextTest()
+
                 }
-                Log.d("FaceDetectRight", "$rotY")
+                Log.d("FaceDetectRight", "${emotionResult.right}")
             }
 
             EmotionType.SMILE -> {
                 if (smilingProbability > 0.7) {
-                    setNextTest()
                     emotionResult.smile = true
+                    setNextTest()
+
                 }
-                Log.d("FaceDetectSmile", "$smilingProbability")
+                Log.d("FaceDetectSmile", "${emotionResult.smile}")
             }
 
             EmotionType.NEUTRAL -> {
-                if (smilingProbability.toInt() < 0.7) {
-                    setNextTest()
+                if (smilingProbability < 0.7) {
                     emotionResult.neutral = true
+                    setNextTest()
+
                 }
+                Log.d("FaceDetectNeutral", "${emotionResult.neutral}")
 
 
             }
@@ -116,9 +112,8 @@ class CameraViewModel @Inject constructor(private val repo: Repository) : ViewMo
 
     fun insertTestResult() {
         viewModelScope.launch {
-            repo.insertEmotion(
-                result
-            )
+            repo.insertEmotion(emotionResult)
+            Log.e("RoomTEST", "$emotionResult")
         }
     }
 }

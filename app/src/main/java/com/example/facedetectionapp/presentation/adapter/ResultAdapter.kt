@@ -1,33 +1,74 @@
 package com.example.facedetectionapp.presentation.adapter
 
+import android.content.Context
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import android.widget.TextView
 import androidx.recyclerview.widget.AsyncListDiffer
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
+import com.example.facedetectionapp.R
 import com.example.facedetectionapp.data.local.entities.EmotionResult
 import com.example.facedetectionapp.databinding.ResultItemsBinding
 import com.example.facedetectionapp.util.GenericDiffUtil
 
 
-class ResultAdapter: ListAdapter<EmotionResult, ResultAdapter.ViewHolder>(GenericDiffUtil<EmotionResult>(
-    myItemsTheSame = { oldItem, newItem -> oldItem.id == newItem.id },
-    myContentsTheSame = { oldItem, newItem -> oldItem == newItem }
-)) {
+class ResultAdapter :
+    ListAdapter<EmotionResult, ResultAdapter.ViewHolder>(GenericDiffUtil<EmotionResult>(
+        myItemsTheSame = { oldItem, newItem -> oldItem.id == newItem.id },
+        myContentsTheSame = { oldItem, newItem -> oldItem == newItem }
+    )) {
 
 
     inner class ViewHolder(private val binding: ResultItemsBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(item: EmotionResult) {
             with(binding) {
-                testNumber.text=item.id.toString()
-                left.text=item.left.toString()
-                right.text=item.right.toString()
-                smile.text=item.smile.toString()
-                neutral.text=item.neutral.toString()
+                testNumber.text = "TEST NUMBER: ${item.id}"
+                left.text = "LEFT: ${item.left}"
+                right.text = "RIGHT: ${item.right}"
+                smile.text = "SMILE: ${item.smile}"
+                neutral.text = "NEUTRAL: ${item.neutral}"
             }
+
+            setDrawableForBooleanValue(
+                binding.left,
+                item.left,
+                R.drawable.smile_svgrepo_com__1___,
+                R.drawable.sad_svgrepo_com
+            )
+            setDrawableForBooleanValue(
+                binding.right,
+                item.right,
+                R.drawable.smile_svgrepo_com__1___,
+                R.drawable.sad_svgrepo_com
+            )
+            setDrawableForBooleanValue(
+                binding.smile,
+                item.smile,
+                R.drawable.smile_svgrepo_com__1___,
+                R.drawable.sad_svgrepo_com
+            )
+            setDrawableForBooleanValue(
+                binding.neutral,
+                item.neutral,
+                R.drawable.smile_svgrepo_com__1___,
+                R.drawable.sad_svgrepo_com
+            )
+
+
         }
+    }
+
+    private fun setDrawableForBooleanValue(
+        textView: TextView,
+        value: Boolean,
+        trueDrawableResId: Int,
+        falseDrawableResId: Int
+    ) {
+        val drawableResId = if (value) trueDrawableResId else falseDrawableResId
+        textView.setCompoundDrawablesWithIntrinsicBounds(0, 0, drawableResId, 0)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
@@ -41,50 +82,3 @@ class ResultAdapter: ListAdapter<EmotionResult, ResultAdapter.ViewHolder>(Generi
     }
 
 }
-//class ResultAdapter() : RecyclerView.Adapter<ResultAdapter.ResultViewHolder>() {
-//    inner class ResultViewHolder(private val binding: ResultItemsBinding) :
-//        RecyclerView.ViewHolder(binding.root) {
-//        fun bind(item: EmotionResult) {
-//            with(binding) {
-//                testNumber.text=item.id.toString()
-//                left.text=item.left.toString()
-//                right.text=item.right.toString()
-//                smile.text=item.smile.toString()
-//                neutral.text=item.neutral.toString()
-//
-//
-//            }
-//
-//    }}
-//
-//
-//    private val differCallBack = object : DiffUtil.ItemCallback<EmotionResult>() {
-//        override fun areItemsTheSame(oldItem: EmotionResult, newItem: EmotionResult): Boolean {
-//            return oldItem.id == newItem.id
-//        }
-//
-//        override fun areContentsTheSame(oldItem: EmotionResult, newItem: EmotionResult): Boolean {
-//            return oldItem == newItem
-//        }
-//    }
-//
-//    val differ = AsyncListDiffer(this, differCallBack)
-//
-//    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ResultViewHolder {
-//        val inflater = LayoutInflater.from(parent.context)
-//        val binding = ResultItemsBinding.inflate(inflater,parent,false)
-//        return ResultViewHolder(binding)
-//    }
-//
-//    override fun getItemCount(): Int {
-//        return differ.currentList.size
-//    }
-//
-//    override fun onBindViewHolder(holder: ResultViewHolder, position: Int) {
-//        val results = differ.currentList[position]
-//        holder.bind(getItemId(results))
-//
-//    }
-//
-//
-//}
